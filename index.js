@@ -114,9 +114,28 @@ server.get('/messages', async (request, response) => {
       response.send(messages);
     }
   } catch {
-    response.sendStatus(422);
+    response.sendStatus(500);
   }
 });
-// server.post('/status', async (request, response) => {});
+
+// post status
+server.post('/status', async (request, response) => {
+  const { user } = request.headers;
+  try {
+    await mongoClient.connect();
+    const participant = await mongoClient.db('batePapoUol').collection('participants').findOne({ name: user });
+    console.log(participant);
+    if (!participant) {
+      response.sendStatus(404);
+      mongoClient.close();
+      return;
+    }
+    await mongoClient.db('batePapoUol').collection('participants')
+      .updateOne({ _id: participant._id }, { $set: { lastStatus: Date.now() } });
+    response.sendStatus(200);
+  } catch {
+    response.sendStatus(500);
+  }
+});
 
 server.listen(5000);
