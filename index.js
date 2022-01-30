@@ -6,10 +6,10 @@ import joi from 'joi';
 import dayjs from 'dayjs';
 
 const server = express();
-const mongoClient = new MongoClient(process.env.MONGO_URI);
 server.use(express.json());
 server.use(cors());
 dotenv.config();
+const mongoClient = new MongoClient(process.env.MONGO_URI);
 
 // post participants
 server.post('/participants', async (request, response) => {
@@ -79,6 +79,7 @@ server.post('/messages', async (request, response) => {
   };
   const validation = messagesSchema.validate(completeMessage);
   if (validation.error) {
+    console.log(validation.error.message);
     response.sendStatus(422);
     return;
   }
@@ -87,6 +88,7 @@ server.post('/messages', async (request, response) => {
     const activeUser = await mongoClient.db('batePapoUol').collection('participants').findOne({ name: request.headers.user });
     if (!activeUser) {
       response.sendStatus(422);
+      return;
     }
     await mongoClient.db('batePapoUol').collection('messages').insertOne(completeMessage);
     response.sendStatus(201);
@@ -97,19 +99,24 @@ server.post('/messages', async (request, response) => {
 
 // get message
 server.get('/messages', async (request, response) => {
+  const { user } = request.headers;
   try {
     await mongoClient.connect();
-    const messages = await mongoClient.db('batePapoUol').collection('messages').find({}).toArray();
-    if (!request.query.limit) {
+    if (!parseInt(request.query.limit, 10)) {
+      const messages = await mongoClient.db('batePapoUol').collection('messages')
+        .find({ $or: [{ to: user }, { from: user }, { type: 'message' }, { type: 'status' }] }).toArray();
+      response.send(messages);
+    } else {
+      const messages = await mongoClient.db('batePapoUol').collection('messages')
+        .find({ $or: [{ to: user }, { from: user }, { type: 'message' }, { type: 'status' }] })
+        .limit(parseInt(request.query.limit, 10))
+        .toArray();
       response.send(messages);
     }
-    response.send(messages);
   } catch {
     response.sendStatus(422);
   }
 });
-server.post('/status', async (request, response) => {
-
-});
+// server.post('/status', async (request, response) => {});
 
 server.listen(5000);
