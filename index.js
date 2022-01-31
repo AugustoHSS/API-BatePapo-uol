@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { MongoClient } from 'mongodb';
+import { ObjectId, MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 import joi from 'joi';
 import dayjs from 'dayjs';
@@ -37,7 +37,6 @@ async function removeInactiveUsers() {
   }
 }
 
-// post participants
 server.post('/participants', async (request, response) => {
   const participantsSchema = joi.object({
     name: joi.string().required(),
@@ -80,7 +79,6 @@ server.post('/participants', async (request, response) => {
   }
 });
 
-// get participants
 server.get('/participants', async (request, response) => {
   try {
     await mongoClient.connect();
@@ -91,7 +89,6 @@ server.get('/participants', async (request, response) => {
   }
 });
 
-// post message
 server.post('/messages', async (request, response) => {
   const messagesSchema = joi.object({
     from: joi.string().required(),
@@ -126,7 +123,6 @@ server.post('/messages', async (request, response) => {
   }
 });
 
-// get message
 server.get('/messages', async (request, response) => {
   const { user } = request.headers;
   try {
@@ -147,7 +143,6 @@ server.get('/messages', async (request, response) => {
   }
 });
 
-// post status
 server.post('/status', async (request, response) => {
   const { user } = request.headers;
   try {
@@ -167,6 +162,31 @@ server.post('/status', async (request, response) => {
   }
 });
 
+server.delete('/messages/:messageId', async (request, response) => {
+  const { user } = request.headers;
+  try {
+    await mongoClient.connect();
+    const messageToDelete = await mongoClient.db('batePapoUol').collection('messages')
+      .findOne({ _id: new ObjectId(request.params.messageId) });
+    if (!messageToDelete) {
+      response.sendStatus(404);
+      mongoClient.close();
+      return;
+    }
+
+    if (user !== messageToDelete.from) {
+      response.sendStatus(401);
+      mongoClient.close();
+      return;
+    }
+    await mongoClient.db('batePapoUol').collection('messages')
+      .deleteOne({ _id: new ObjectId(request.params.messageId) });
+    mongoClient.close();
+  } catch {
+    response.sendStatus(500);
+  }
+  response.sendStatus(200);
+});
 setInterval(removeInactiveUsers, 15000);
 
 server.listen(5000);
