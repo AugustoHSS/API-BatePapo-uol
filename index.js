@@ -11,6 +11,32 @@ server.use(cors());
 dotenv.config();
 const mongoClient = new MongoClient(process.env.MONGO_URI);
 
+async function logoutMessage(element) {
+  try {
+    await mongoClient.db('batePapoUol').collection('messages').insertOne({
+      from: element.name,
+      to: 'Todos',
+      text: 'sai da sala...',
+      type: 'status',
+      time: dayjs().format('HH:mm:ss'),
+    });
+  } catch (error) {
+    console.log(error);
+  }
+}
+async function removeInactiveUsers() {
+  const timeToInactive = Date.now() - 10000;
+  try {
+    await mongoClient.connect();
+    const inactiveParticipants = await mongoClient.db('batePapoUol').collection('participants')
+      .find({ lastStatus: { $lte: timeToInactive } }).toArray();
+    await mongoClient.db('batePapoUol').collection('participants').deleteMany({ lastStatus: { $lte: timeToInactive } });
+    inactiveParticipants.forEach(logoutMessage);
+  } catch (error) {
+    console.log(error);
+  }
+}
+
 // post participants
 server.post('/participants', async (request, response) => {
   const participantsSchema = joi.object({
@@ -29,6 +55,7 @@ server.post('/participants', async (request, response) => {
     );
     if (alreadyHaveParticipant) {
       response.sendStatus(409);
+      mongoClient.close();
       return;
     }
 
@@ -46,8 +73,10 @@ server.post('/participants', async (request, response) => {
     });
 
     response.sendStatus(201);
+    mongoClient.close();
   } catch {
     response.sendStatus(500);
+    mongoClient.close();
   }
 });
 
@@ -137,5 +166,7 @@ server.post('/status', async (request, response) => {
     response.sendStatus(500);
   }
 });
+
+setInterval(removeInactiveUsers, 15000);
 
 server.listen(5000);
