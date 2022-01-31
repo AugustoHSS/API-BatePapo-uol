@@ -124,7 +124,6 @@ server.post('/status', async (request, response) => {
   try {
     await mongoClient.connect();
     const participant = await mongoClient.db('batePapoUol').collection('participants').findOne({ name: user });
-    console.log(participant);
     if (!participant) {
       response.sendStatus(404);
       mongoClient.close();
@@ -133,6 +132,7 @@ server.post('/status', async (request, response) => {
     await mongoClient.db('batePapoUol').collection('participants')
       .updateOne({ _id: participant._id }, { $set: { lastStatus: Date.now() } });
     response.sendStatus(200);
+    mongoClient.close();
   } catch {
     response.sendStatus(500);
   }
